@@ -6,15 +6,31 @@ use std::io::{Error, ErrorKind};
 use std::fs::{self};
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
-use std::os::unix::fs::symlink;
 
+#[cfg(target_family = "unix")]
 pub(crate) fn create_symlink(source_path: &Path, target_path: &Path) -> io::Result<()> {
-    if cfg!(target_family = "unix") {
-        info!("create symbolic link {} -> {}", source_path.display(), target_path.display());
-        symlink(source_path, target_path)
+    use std::os::unix::fs::symlink;
+    info!(
+        "create symbolic link {} -> {}",
+        source_path.display(),
+        target_path.display()
+    );
+    symlink(source_path, target_path)
+}
+
+#[cfg(windows)]
+pub(crate) fn create_symlink(source_path: &Path, target_path: &Path) -> io::Result<()> {
+    use std::os::windows::fs::{symlink_dir, symlink_file};
+    if source_path.is_dir() {
+        symlink_dir(source_path, target_path)
     } else {
-        Err(Error::new(ErrorKind::Other, "OS not supported"))
+        symlink_file(source_path, target_path)
     }
+}
+
+#[cfg(not(any(target_family = "unix", windows)))]
+pub(crate) fn create_symlink(source_path: &Path, target_path: &Path) -> io::Result<()> {
+    Err(Error::new(ErrorKind::Other, "OS not supported"))
 }
 
 pub(crate) fn build_backup_path(path: &Path) ->io::Result<PathBuf> {
